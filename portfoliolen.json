@@ -1,0 +1,1171 @@
+{
+  "name": "portfoliolen",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## PortfolioLens — Qdrant Portfolio Agent\n\n### Two Operating Modes\n\n### WORKFLOW 1 — News Ingestion (Scheduled)\n\nRuns every 6 hours:\n\n1. Fetches financial news from the FastAPI endpoint\n2. Cleans and normalizes article content\n3. Gemini analyzes each article:\n\n   * importance\n   * sentiment\n   * summary\n   * mentioned tickers\n4. Generates embeddings using `gemini-embedding-001`\n5. Performs deduplication through Qdrant\n   (cosine similarity > 0.85)\n6. Upserts new articles into the `financial_news` collection\n7. Generates article drafts only for new high-importance stories\n8. Stores processed records in Supabase for historical tracking\n\n### WORKFLOW 2 — Portfolio Query API (Webhook)\n\nTriggered by frontend requests:\n\n1. Receives a portfolio request:\n   `{ \"tickers\": [\"AAPL\", \"NVDA\", \"BTC\"] }`\n2. Performs vector search in Qdrant for each ticker\n3. Merges and filters results by recency and relevance\n4. Gemini generates a personalized portfolio digest\n5. Returns structured JSON to the frontend\n\n### Setup\n\n* [ ] Google Gemini API credentials\n* [ ] Qdrant Cloud URL and API Key\n* [ ] Supabase credentials\n* [ ] Replace the ngrok URL with your own FastAPI endpoint\n\n### Technologies\n\n* Qdrant Cloud\n* Google Gemini\n* n8n\n* Supabase\n* FastAPI\n* React + Vercel\n\n### Purpose\n\nPortfolioLens demonstrates how vector search can be used for financial intelligence, relationship discovery, and portfolio monitoring beyond traditional chatbot interfaces.\n",
+        "height": 700,
+        "width": 760
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1040,
+        208
+      ],
+      "id": "45f17b61-d63b-41ad-8e7d-ff62b0b008a2",
+      "name": "README"
+    },
+    {
+      "parameters": {
+        "content": "## WORKFLOW 1\n### Ingestion Pipeline\n(Runs automatically every 6 hours)",
+        "height": 120,
+        "width": 500,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f687f42f-afb9-4092-8c0d-e55bc1aba095",
+      "name": "Note W1"
+    },
+    {
+      "parameters": {
+        "content": "## WORKFLOW 2\n### Portfolio Query API\n(Triggered by webhook requests from the frontend)",
+        "height": 120,
+        "width": 500,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        16,
+        736
+      ],
+      "id": "9be4f2ad-1396-436e-afb2-f18ac4be58bb",
+      "name": "Note W2"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -64,
+        352
+      ],
+      "id": "087ada32-1e37-42dd-90f6-7445a73f79b0",
+      "name": "Every 6 Hours"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Title: {{ $json.title }}\nURL: {{ $json.url }}\n\nAnalyze this financial news article.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a financial news analyst. Analyze the article and extract structured data.\n\nRULES:\n- importance: \"important\" only if directly impacts stock/crypto prices, otherwise \"not_important\"\n- tone: \"positive\", \"negative\", or \"neutral\"\n- summary: 2-3 sentence summary\n- tickers: extract ALL stock symbols and crypto mentioned\n  Examples: Apple→AAPL, Nvidia→NVDA, Bitcoin→BTC, Tesla→TSLA\n  If no specific ticker: use sector ETF (tech→QQQ, crypto→BTC)\n- sentiment_score: 0.0 (very negative) to 1.0 (very positive)\n\nProvide your analysis in the structured format."
+        }
+      },
+      "id": "0038cd0f-a6a8-47d7-aa7a-6197200f156b",
+      "name": "News Analysis Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1568,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-importance",
+              "leftValue": "={{ $json.output.importance }}",
+              "rightValue": "important",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "87f93943-d1bb-4b7f-977c-d11dccbaef3b",
+      "name": "Check Importance",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "title",
+              "value": "={{ $(\"Split News Items\").item.json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "url",
+              "value": "={{ $(\"Split News Items\").item.json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "importance",
+              "value": "={{ $json.output.importance }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "tone",
+              "value": "={{ $json.output.tone }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "summary",
+              "value": "={{ $json.output.summary }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "tickers",
+              "value": "={{ $json.output.tickers }}",
+              "type": "array"
+            },
+            {
+              "id": "7",
+              "name": "sentiment_score",
+              "value": "={{ $json.output.sentiment_score }}",
+              "type": "number"
+            },
+            {
+              "id": "8",
+              "name": "date",
+              "value": "={{ new Date().toISOString().split(\"T\")[0] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9c0b2b58-692c-4639-a032-74ff00aeb756",
+      "name": "Prepare for Qdrant",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2144,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"models/gemini-embedding-001\",\n  \"content\": {\n    \"parts\": [{\n      \"text\": {{ JSON.stringify($json.title + \" \" + $json.summary) }}\n    }]\n  }\n}",
+        "options": {}
+      },
+      "id": "6168a4af-d388-4982-a2f1-96b471fe5fc2",
+      "name": "Generate Embedding (Gemini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2592,
+        368
+      ],
+      "notes": "Генерируем vector embedding через Gemini text-embedding-004 для семантического поиска в Qdrant"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Check if Qdrant found a near-duplicate (cosine similarity > 0.82)\nconst result = $input.item.json;\nconst hits = result.result || [];\n\nif (hits.length > 0 && hits[0].score >= 0.82) {\n  // Duplicate found — skip this article\n  return { json: { is_duplicate: true, score: hits[0].score } };\n} else {\n  // New article — pass through with embedding\n  return { json: { is_duplicate: false, ...result } };\n}\n"
+      },
+      "id": "77c451fe-43cb-40f9-893b-c68564a6c663",
+      "name": "Is Duplicate?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3040,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "https://2449cd38-54c0-4cae-9f73-85217ac3a273.eu-west-1-0.aws.cloud.qdrant.io:6333/collections/financial_news/points",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api-key"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"points\": [{\n    \"id\": {{ JSON.stringify($(\"Generate UUID from URL\").item.json.article_id) }},\n    \"vector\": {{ JSON.stringify($(\"Generate Embedding (Gemini)\").item.json.embedding.values) }},\n    \"payload\": {\n      \"title\": {{ JSON.stringify($(\"Generate UUID from URL\").item.json.title) }},\n      \"url\": {{ JSON.stringify($(\"Generate UUID from URL\").item.json.url) }},\n      \"summary\": {{ JSON.stringify($(\"Generate UUID from URL\").item.json.summary) }},\n      \"tone\": {{ JSON.stringify($(\"Generate UUID from URL\").item.json.tone) }},\n      \"sentiment_score\": {{ $(\"Generate UUID from URL\").item.json.sentiment_score }},\n      \"tickers\": {{ JSON.stringify($(\"Generate UUID from URL\").item.json.tickers) }},\n      \"date\": {{ JSON.stringify($(\"Generate UUID from URL\").item.json.date) }},\n      \"source\": \"financial_news\"\n    }\n  }]\n}",
+        "options": {}
+      },
+      "id": "c397cb46-d0f8-4fa7-9cb1-6606347170fa",
+      "name": "Qdrant — Upsert Point",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3264,
+        368
+      ],
+      "notes": "Сохраняем вектор + payload в Qdrant collection 'financial_news'"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=News Title: {{ $('Generate UUID from URL').item.json.title }}\nURL: {{ $('Generate UUID from URL').item.json.url }}\nTone: {{ $('Generate UUID from URL').item.json.tone }}\nSummary: {{ $('Generate UUID from URL').item.json.summary }}\n\nWrite an engaging 200-300 word article/post with {{ $('Generate UUID from URL').item.json.tone }} tone. End with source: {{ $('Generate UUID from URL').item.json.url }}",
+        "options": {
+          "systemMessage": "You are a professional financial content writer. Write ONLY the article text (200-300 words) in English, no JSON, no markdown, no extra words."
+        }
+      },
+      "id": "e9f044a5-ba4d-4fe9-a8b8-84435f1e6e73",
+      "name": "Article Generator Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        3488,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "title",
+              "value": "={{ $('Generate UUID from URL').item.json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "url",
+              "value": "={{ $('Generate UUID from URL').item.json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "importance",
+              "value": "important",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "tone",
+              "value": "={{ $('Generate UUID from URL').item.json.tone }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "summary",
+              "value": "={{ $('Generate UUID from URL').item.json.summary }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "tickers",
+              "value": "={{ $('Generate UUID from URL').item.json.tickers }}",
+              "type": "array"
+            },
+            {
+              "id": "7",
+              "name": "sentiment_score",
+              "value": "={{ $('Generate UUID from URL').item.json.sentiment_score }}",
+              "type": "number"
+            },
+            {
+              "id": "8",
+              "name": "date",
+              "value": "={{ $('Generate UUID from URL').item.json.date }}",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "generated_article",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c6416a7a-2e9b-4f31-aafa-6bafaefaab1d",
+      "name": "Combine All Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3840,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "Sava",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $json.title }}"
+            },
+            {
+              "fieldId": "url",
+              "fieldValue": "={{ $json.url }}"
+            },
+            {
+              "fieldId": "importance",
+              "fieldValue": "={{ $json.importance }}"
+            },
+            {
+              "fieldId": "tone",
+              "fieldValue": "={{ $json.tone }}"
+            },
+            {
+              "fieldId": "summary",
+              "fieldValue": "={{ $json.summary }}"
+            },
+            {
+              "fieldId": "tickers",
+              "fieldValue": "={{ JSON.stringify($json.tickers) }}"
+            },
+            {
+              "fieldId": "sentiment_score",
+              "fieldValue": "={{ $json.sentiment_score }}"
+            },
+            {
+              "fieldId": "date",
+              "fieldValue": "={{ $json.date }}"
+            },
+            {
+              "fieldId": "generated_article",
+              "fieldValue": "={{ $json.generated_article }}"
+            }
+          ]
+        }
+      },
+      "id": "e74be748-f40b-4c8a-9bc5-b22b22e33820",
+      "name": "Save to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4064,
+        368
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "XSysoZM9zEVee0oJ",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "portfolio",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "7406fdb5-e826-46e1-9cfb-d8197c5de768",
+      "name": "POST /portfolio Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        896
+      ],
+      "webhookId": "3e5edbf9-27dd-417a-8975-045f2eb62efe",
+      "notes": "Принимает POST {tickers: ['AAPL', 'NVDA', 'BTC']} с фронтенда"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract tickers from webhook body\n// Supports both {tickers: [...]} and plain array\nconst body = items[0].json.body;\nlet tickers = [];\n\nif (typeof body === \"string\") {\n  // Parse JSON string\n  try {\n    const parsed = JSON.parse(body);\n    tickers = Array.isArray(parsed) ? parsed : (parsed.tickers || []);\n  } catch (e) {\n    throw new Error(\"Invalid JSON in body. Send array or {tickers: [...]}.\");\n  }\n} else if (Array.isArray(body)) {\n  tickers = body;\n} else if (body && body.tickers) {\n  tickers = body.tickers;\n}\n\nif (!tickers.length) {\n  throw new Error(\"No tickers provided. Send array or {tickers: [...]}.\");\n}\n\n// Create one item per ticker for parallel processing\nreturn tickers.map(ticker => ({\n  json: { ticker: ticker.toUpperCase().trim() }\n}));\n"
+      },
+      "id": "e301f157-ed63-490e-ad65-707fde6f422f",
+      "name": "Extract Tickers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"models/gemini-embedding-001\",\n  \"content\": {\n    \"parts\": [{\n      \"text\": {{ JSON.stringify(\"Financial news about \" + $json.ticker + \" stock price earnings performance\") }}\n    }]\n  }\n}",
+        "options": {}
+      },
+      "id": "45762169-e5a7-4e9e-bdc5-6f581e72f855",
+      "name": "Embed Ticker Query",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        448,
+        896
+      ],
+      "notes": "Создаём embedding для поискового запроса по каждому тикеру"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://2449cd38-54c0-4cae-9f73-85217ac3a273.eu-west-1-0.aws.cloud.qdrant.io:6333/collections/financial_news/points/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api-key"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"vector\": {{ JSON.stringify($json.embedding.values) }},\n  \"limit\": 20,\n  \"score_threshold\": 0.55,\n  \"with_payload\": true\n}",
+        "options": {}
+      },
+      "id": "f843e800-b0e5-4fe2-9d1d-86b32306eaf6",
+      "name": "Qdrant — Search by Ticker",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        672,
+        896
+      ],
+      "notes": "Векторный поиск в Qdrant с фильтром по тикеру"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Process Qdrant search results for each ticker\n// Filter by ticker in code since Qdrant collection has no index\n\nconst ticker = $('Extract Tickers').item.json.ticker;\nconst searchResult = $input.item.json;\nconst hits = searchResult.result || [];\n\n// Filter hits to only include articles mentioning this ticker\nconst relevantHits = hits.filter(hit => {\n  const tickers = hit.payload.tickers || [];\n  return tickers.includes(ticker);\n});\n\n// Helper to extract hostname from URL without using URL constructor\nfunction getHostname(url) {\n  if (!url) return 'Unknown';\n  return url\n    .replace(/^https?:\\/\\//i, '')\n    .split('/')[0]\n    .replace('www.', '')\n    .toLowerCase();\n}\n\nconst articles = relevantHits.map((hit, idx) => ({\n  id: hit.id || idx,\n  ticker: ticker,\n  title: hit.payload.title,\n  url: hit.payload.url,\n  date: hit.payload.date,\n  sentiment: hit.payload.tone,\n  score: hit.payload.sentiment_score,\n  summary: hit.payload.summary,\n  source: getHostname(hit.payload.url),\n  vector_score: hit.score\n}));\n\nreturn { json: { ticker, articles } };\n"
+      },
+      "id": "03ec4771-8c31-4e79-8d2c-b1b4ef510ec6",
+      "name": "Format Search Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "results",
+        "options": {}
+      },
+      "id": "6047612e-7a3d-4db5-a78b-f02c69c04ed2",
+      "name": "Aggregate All Ticker Results",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        896
+      ],
+      "notes": "Объединяем результаты по всем тикерам в один объект"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the news map {AAPL: [...], NVDA: [...]} from aggregated results\nconst results = items[0].json.results || [];\n\nconst newsMap = {};\nconst allArticles = [];\n\nfor (const item of results) {\n  const ticker = item.ticker;\n  const articles = item.articles || [];\n  newsMap[ticker] = articles;\n  allArticles.push(...articles);\n}\n\n// Build context string for Gemini digest\nconst context = Object.entries(newsMap).map(([ticker, arts]) => {\n  if (!arts.length) return `${ticker}: No recent news found.`;\n  return `${ticker}:\\n` + arts.map(a => `  - [${a.sentiment?.toUpperCase()}] ${a.title}: ${a.summary}`).join('\\n');\n}).join('\\n\\n');\n\nreturn [{ json: { newsMap, allArticles, context, tickers: Object.keys(newsMap) } }];\n"
+      },
+      "id": "c8dcc23c-47f5-4a5e-ae1f-a97304e3d7e7",
+      "name": "Build News Map",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Portfolio tickers: {{ $json.tickers.join(', ') }}\n\nRecent news context:\n{{ $json.context }}\n\nGenerate a personalized portfolio digest.",
+        "options": {
+          "systemMessage": "You are a senior financial analyst. Based on the news context provided, write a concise personalized portfolio digest (250-350 words) in English.\n\nStructure:\n1. Start with overall portfolio signal (bullish/bearish/mixed)\n2. For each ticker: 1-2 sentences on key news and implication\n3. End with 1-2 actionable suggestions\n\nUse **bold** for ticker names and key signals.\nBe direct, data-driven, and avoid generic financial disclaimers.\nReturn ONLY the digest text, no JSON, no markdown headers."
+        }
+      },
+      "id": "18858ef8-6bcf-479b-8c47-2bbfe1467a56",
+      "name": "Gemini — Portfolio Digest",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1568,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 5
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        448,
+        320
+      ],
+      "id": "9a214baa-0a3f-4ce4-abe1-900ab957a3f2",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "url": "https://finance.yahoo.com/news/rssindex",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        176
+      ],
+      "id": "fca3aba9-72d3-45c3-bfcd-45d9ad6d18d7",
+      "name": "Yahoo Finance"
+    },
+    {
+      "parameters": {
+        "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        368
+      ],
+      "id": "b9a5d8bc-cafb-4dc3-a280-45fdf0a4b13c",
+      "name": "CNBC"
+    },
+    {
+      "parameters": {
+        "url": "https://www.coindesk.com/arc/outboundfeeds/rss/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        560
+      ],
+      "id": "eeb3061e-ba14-447c-b5c7-62ee8f75e90a",
+      "name": "CoinDesk"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Нормализуем RSS item в стандартный формат\nreturn items.map(item => {\n    const link = item.json.link || '';\n    \n    let source = 'rss';\n    if (link) {\n        // Парсим hostname без использования URL (чтобы избежать \"URL is not defined\")\n        source = link\n            .replace(/^https?:\\/\\//i, '')   // убираем http:// или https://\n            .split('/')[0]                  // берём первую часть до /\n            .replace('www.', '')            // убираем www.\n            .toLowerCase();\n    }\n\n    return {\n        json: {\n            title: item.json.title || '',\n            url: link,\n            date: item.json.pubDate \n                ? new Date(item.json.pubDate).toISOString().split('T')[0] \n                : new Date().toISOString().split('T')[0],\n            source: source\n        }\n    };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        368
+      ],
+      "id": "fd03a797-b775-4ae9-937f-ad7647bca6db",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        672,
+        368
+      ],
+      "id": "fe086e3c-4f87-45a9-8e4f-8f3021bdd537",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pass through items as-is (no splitting needed)\nreturn items;"
+      },
+      "id": "899af437-fe30-489c-9b14-9f8fa4e7fd83",
+      "name": "Split News Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "maxItems": 30
+      },
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        368
+      ],
+      "id": "efa586ef-01a3-42b5-8e29-a18ba2a420a4",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{ \"importance\": \"important\", \"tone\": \"positive\", \"summary\": \"Brief summary here\", \"tickers\": [\"AAPL\", \"NVDA\"], \"sentiment_score\": 0.75 }"
+      },
+      "id": "c032f9c4-4656-4e19-acf2-a994346e4658",
+      "name": "Analysis Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1712,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gemma4:31b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        1584,
+        592
+      ],
+      "id": "e8b27d43-11fb-45bf-939f-37dfaf476000",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "EkoExwldl12PUHd0",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://2449cd38-54c0-4cae-9f73-85217ac3a273.eu-west-1-0.aws.cloud.qdrant.io:6333/collections/financial_news/points/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api-key"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"vector\": {{ JSON.stringify($json.embedding.values) }},\n  \"limit\": 1,\n  \"score_threshold\": 0.82,\n  \"with_payload\": false\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2816,
+        368
+      ],
+      "id": "7724327b-ca4e-4495-b04d-11437975d280",
+      "name": "Query Points Qdrant"
+    },
+    {
+      "parameters": {
+        "jsCode": "function uuidFromString(str) {\n  let hash = 0;\n  for (let i = 0; i < str.length; i++) {\n    hash = ((hash << 5) - hash) + str.charCodeAt(i);\n    hash |= 0;\n  }\n  const h = Math.abs(hash).toString(16).padStart(8, '0');\n  const h2 = Math.abs(hash * 2654435761).toString(16).padStart(8, '0');\n  return `${h.substring(0,8)}-${h2.substring(0,4)}-4${h.substring(1,4)}-a${h2.substring(4,7)}-${h.substring(0,4)}${h2.substring(0,8)}`;\n}\n\nreturn items.map(item => ({\n  json: {\n    ...item.json,\n    article_id: uuidFromString(item.json.url)\n  }\n}));"
+      },
+      "id": "af5270b5-3b45-4444-932a-b11183e21b18",
+      "name": "Generate UUID from URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2368,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gemma4:31b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        3568,
+        592
+      ],
+      "id": "f1b22d87-63c6-4870-9ed8-88c18a943934",
+      "name": "Ollama Chat Model1",
+      "credentials": {
+        "ollamaApi": {
+          "id": "EkoExwldl12PUHd0",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"newsMap\": $(\"Build News Map\").item.json.newsMap, \"digest\": $(\"Gemini — Portfolio Digest\").item.json.output } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1920,
+        896
+      ],
+      "id": "a5efc154-5f74-4c3c-ba9c-e1b0d91aa9a3",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "model": "gemma4:31b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        1648,
+        1120
+      ],
+      "id": "7c395b6a-f340-402b-baf4-78ec480b9102",
+      "name": "Ollama Chat Model2",
+      "credentials": {
+        "ollamaApi": {
+          "id": "EkoExwldl12PUHd0",
+          "name": "Ollama account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Yahoo Finance",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CNBC",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CoinDesk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "News Analysis Agent": {
+      "main": [
+        [
+          {
+            "node": "Check Importance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Importance": {
+      "main": [
+        [
+          {
+            "node": "Prepare for Qdrant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare for Qdrant": {
+      "main": [
+        [
+          {
+            "node": "Generate UUID from URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Embedding (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Query Points Qdrant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Qdrant — Upsert Point",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant — Upsert Point": {
+      "main": [
+        [
+          {
+            "node": "Article Generator Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Article Generator Agent": {
+      "main": [
+        [
+          {
+            "node": "Combine All Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine All Fields": {
+      "main": [
+        [
+          {
+            "node": "Save to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /portfolio Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Tickers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Tickers": {
+      "main": [
+        [
+          {
+            "node": "Embed Ticker Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed Ticker Query": {
+      "main": [
+        [
+          {
+            "node": "Qdrant — Search by Ticker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant — Search by Ticker": {
+      "main": [
+        [
+          {
+            "node": "Format Search Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Search Results": {
+      "main": [
+        [
+          {
+            "node": "Aggregate All Ticker Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate All Ticker Results": {
+      "main": [
+        [
+          {
+            "node": "Build News Map",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build News Map": {
+      "main": [
+        [
+          {
+            "node": "Gemini — Portfolio Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini — Portfolio Digest": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Yahoo Finance": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "CNBC": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "CoinDesk": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Split News Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split News Items": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "News Analysis Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analysis Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "News Analysis Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "News Analysis Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Points Qdrant": {
+      "main": [
+        [
+          {
+            "node": "Is Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate UUID from URL": {
+      "main": [
+        [
+          {
+            "node": "Generate Embedding (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Article Generator Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Gemini — Portfolio Digest",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "384bca19-467f-4c0f-95eb-40bf5b6bb2b2",
+  "meta": {
+    "instanceId": "8c8b30e39770f840ba7b209ab84e152a10608b7a5e6d31170811fcc02247d0ba"
+  },
+  "id": "Mj9edhESZcgGbhjT",
+  "tags": []
+}
