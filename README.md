@@ -1,7 +1,5 @@
 # PortfolioLens
 
-# PortfolioLens
-
 PortfolioLens is a visual market intelligence platform that uses Qdrant vector search to discover and visualize relationships between financial assets.
 
 Instead of interacting with a chatbot, users explore an interactive network of assets connected through semantic similarity in financial news. By combining Qdrant, Gemini embeddings, and AI-generated portfolio analysis, PortfolioLens helps investors understand hidden market relationships, sentiment shifts, and emerging risks.
@@ -58,6 +56,21 @@ https://portfoliolens-navy.vercel.app/
 ## Demo Video
 https://www.dropbox.com/scl/fi/lolo9abul7m1hi8xxg5mb/PortfolioLens.mp4?rlkey=ykaxfewlpymv4qv3wee2g3hf6&st=pzibo7o1&dl=0
 
+## Screenshots
+
+### Risk Vibe Map
+
+<img width="2304" height="1399" alt="Снимок экрана (1341)" src="https://github.com/user-attachments/assets/0bfdce44-bec0-4417-91d2-2d79c4c291dc" />
+
+
+
+
+### News Dashboard
+
+<img width="2325" height="1409" alt="Снимок экрана (1342)" src="https://github.com/user-attachments/assets/d7f52b28-b5ae-4987-ae6d-0624471e3361" />
+
+
+
 ## Getting Started
 
 ### Prerequisites
@@ -89,6 +102,9 @@ The repository includes two n8n workflows:
 2. **Portfolio Query API** — Webhook endpoint that accepts `{tickers: [...]}` → vector search → format → Gemini digest → respond
 
 To use, import the workflow JSON into your n8n instance and activate it.
+
+
+<img width="1583" height="508" alt="image" src="https://github.com/user-attachments/assets/508ffd3a-a0ab-46f3-93db-8e9ad161d920" />
 
 ## Deployment
 
