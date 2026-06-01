@@ -1,6 +1,15 @@
 # PortfolioLens
 
-An AI-powered financial portfolio dashboard that visualizes risk relationships between assets and aggregates semantic news sentiment analysis.
+# PortfolioLens
+
+PortfolioLens is a visual market intelligence platform that uses Qdrant vector search to discover and visualize relationships between financial assets.
+
+Instead of interacting with a chatbot, users explore an interactive network of assets connected through semantic similarity in financial news. By combining Qdrant, Gemini embeddings, and AI-generated portfolio analysis, PortfolioLens helps investors understand hidden market relationships, sentiment shifts, and emerging risks.
+
+Built solo in 4 days for the Qdrant "Think Outside the Bot" Hackathon 2026.
+
+
+https://portfoliolens-navy.vercel.app/
 
 ## Features
 
@@ -45,6 +54,9 @@ An AI-powered financial portfolio dashboard that visualizes risk relationships b
        └──────────────── response ────────────────────┘
               { newsMap, digest }
 ```
+
+## Demo Video
+https://www.dropbox.com/scl/fi/lolo9abul7m1hi8xxg5mb/PortfolioLens.mp4?rlkey=ykaxfewlpymv4qv3wee2g3hf6&st=pzibo7o1&dl=0
 
 ## Getting Started
 
@@ -93,3 +105,36 @@ The `api/proxy.js` serverless function acts as a CORS proxy to the n8n webhook.
 ## License
 
 MIT
+
+
+
+## Why Qdrant?
+
+Qdrant is used as the core intelligence layer of PortfolioLens.
+
+Instead of keyword matching, news articles are embedded using Gemini embeddings and stored as vectors in Qdrant. This enables:
+
+* Semantic similarity search across financial news
+* Discovery of relationships between assets based on shared news context
+* News deduplication and clustering
+* Retrieval of the most relevant portfolio signals
+* AI-generated portfolio summaries grounded in retrieved articles
+
+Without vector search, PortfolioLens would not be able to build the asset relationship graph or uncover hidden connections between seemingly unrelated assets.
+
+
+## Hackathon Innovation
+
+Most financial AI products rely on chat interfaces.
+
+PortfolioLens takes a different approach by turning vector search results into an interactive market map.
+
+Users do not ask questions. Instead, they explore relationships visually:
+
+* Assets become nodes
+* Semantic similarity becomes edges
+* News sentiment becomes visual signals
+* AI generates portfolio-level insights
+
+This demonstrates a non-chatbot application of vector search focused on market intelligence and relationship discovery.
+
